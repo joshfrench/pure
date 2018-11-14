@@ -293,8 +293,27 @@ prompt_pure_async_git_dirty() {
 	else
 		test -z "$(GIT_OPTIONAL_LOCKS=0 command git status --porcelain --ignore-submodules -u${untracked_git_mode})"
 	fi
+# prompt_pure_async_git_status() {
+# 	local file_status status_summary untracked unstaged staged
+#
+# 	rm -f /tmp/zsh-git-status
+#
+# 	git status --porcelain --ignore-submodules -unormal | while IFS='' read -r file_status; do
+# 		if [[ "${file_status:0:2}" == '??' ]]; then
+# 			echo "untracked: $file_status" >> /tmp/zsh-git-status
+# 			untracked='%F{red}●'
+# 		elif [[ "${file_status:0:1}" != ' ' ]]; then
+# 				echo "staged: $file_status" >> /tmp/zsh-git-status
+# 				staged='%F{green}●'
+# 		elif [[ "${file_status:1:2}" != ' ' ]]; then
+# 			echo "unstaged: $file_status" >> /tmp/zsh-git-status
+# 			unstaged='%F{yellow}●'
+# 		fi
+# 	done
+#
+# 	status_summary="${untracked}${unstaged}${staged}"
 
-	return $?
+	[[ -n $status_summary ]] && echo "${status_summary}%f"
 }
 
 prompt_pure_async_git_fetch() {
@@ -546,15 +565,15 @@ prompt_pure_async_callback() {
 				prompt_pure_git_fetch_pattern+="|$output"
 			fi
 			;;
-		prompt_pure_async_git_dirty)
-			local prev_dirty=$prompt_pure_git_dirty
-			if (( code == 0 )); then
-				unset prompt_pure_git_dirty
+		prompt_pure_async_git_status)
+			local prev_status=$prompt_pure_git_status
+			if [[ -z "$output" ]]; then
+				unset prompt_pure_git_status
 			else
-				typeset -g prompt_pure_git_dirty="*"
+				typeset -g prompt_pure_git_status="$output"
 			fi
 
-			[[ $prev_dirty != $prompt_pure_git_dirty ]] && do_render=1
+			[[ $prev_status != $prompt_pure_git_status ]] && do_render=1
 
 			# When `prompt_pure_git_last_dirty_check_timestamp` is set, the Git info is displayed
 			# in a different color. To distinguish between a "fresh" and a "cached" result, the
