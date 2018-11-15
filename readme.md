@@ -1,34 +1,14 @@
 # Pure
 
-> Pretty, minimal and fast ZSH prompt
+> Pretty, minimal and fast ZSH prompt (Lyra edition)
 
-<img src="screenshot.png" width="864">
+<img src="screenshot.png" width="511">
 
-<br>
+This is my fork of [the pure prompt](https://github.com/sindresorhus/pure) for zsh, with these changes:
 
----
-
-<div align="center">
-	<p>
-		<p>
-			<sup>
-				<a href="https://github.com/sponsors/sindresorhus">Sindre Sorhus' open source work is supported by the community</a>
-			</sup>
-		</p>
-		<sup>Special thanks to:</sup>
-		<br>
-		<br>
-		<a href="https://standardresume.co/tech">
-			<img src="https://sindresorhus.com/assets/thanks/standard-resume-logo.svg" width="200"/>
-		</a>
-	</p>
-</div>
-
----
-
-<br>
-
-## Overview
+- More detailed git status: a red dot for untracked files, a yellow dot for unstaged changes, a green dot for staged changes (ready to be committed)
+- The current `$AWS_PROFILE` is added to the prompt
+- The current Kuberenetes context is added to the prompt
 
 Most prompts are cluttered, ugly and slow. We wanted something visually pleasing that stayed out of our way.
 
@@ -268,3 +248,6 @@ See [FAQ Archive](https://github.com/sindresorhus/pure/wiki/FAQ-Archive) for pre
 [![Sindre Sorhus](https://github.com/sindresorhus.png?size=100)](https://sindresorhus.com) | [![Mathias Fredriksson](https://github.com/mafredri.png?size=100)](https://github.com/mafredri)
 ---|---
 [Sindre Sorhus](https://github.com/sindresorhus) | [Mathias Fredriksson](https://github.com/mafredri)
+=======
+For all other information, please consult the upstream readme.
+>>>>>>> 3d2391e (Update the readme)
