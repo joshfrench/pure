@@ -158,6 +158,10 @@ prompt_pure_preprompt_render() {
 	if [[ -n $AWS_PROFILE ]]; then
 		preprompt_parts+=("%F{208}☁︎ ${AWS_PROFILE}%f")
 	fi
+	# Kubernetes context
+	if [[ -n $prompt_pure_kubernetes_context ]]; then
+		preprompt_parts+=("%F{39}☸︎ ${prompt_pure_kubernetes_context}%f")
+	fi
 
 	# Execution time.
 	[[ -n $prompt_pure_cmd_exec_time ]] && preprompt_parts+=('%F{$prompt_pure_colors[execution_time]}${prompt_pure_cmd_exec_time}%f')
@@ -416,6 +420,11 @@ prompt_pure_async_init() {
 	async_worker_eval "prompt_pure" prompt_pure_async_renice
 }
 
+prompt_pure_async_kubernetes_context() {
+	setopt localoptions noshwordsplit
+	command kubectl config current-context 2>/dev/null
+}
+
 prompt_pure_async_tasks() {
 	setopt localoptions noshwordsplit
 
@@ -485,6 +494,8 @@ prompt_pure_async_refresh() {
 	else
 		unset prompt_pure_git_stash
 	fi
+
+	async_job "prompt_pure" prompt_pure_async_kubernetes_context
 }
 
 prompt_pure_check_git_arrows() {
@@ -621,6 +632,16 @@ prompt_pure_async_callback() {
 			local prev_stash=$prompt_pure_git_stash
 			typeset -g prompt_pure_git_stash=$output
 			[[ $prev_stash != $prompt_pure_git_stash ]] && do_render=1
+      ;;
+		prompt_pure_async_kubernetes_context)
+			local prev_context=$prompt_pure_kubernetes_context
+			if (( code == 0 )); then
+				typeset -g prompt_pure_kubernetes_context="$output"
+			else
+				unset prompt_pure_kubernetes_context
+			fi
+
+			[[ $prev_context != $prompt_pure_kubernetes_context ]] && do_render=1
 			;;
 	esac
 
