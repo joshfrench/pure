@@ -298,11 +298,12 @@ prompt_pure_async_git_dirty() {
 # prompt_pure_async_git_status() {
 # 	local file_status status_summary untracked unstaged staged
 #
-# 	git status --porcelain --ignore-submodules -unormal | while IFS='' read -r file_status; do
+# 	git --no-optional-locks status --porcelain --ignore-submodules -unormal | while IFS='' read -r file_status; do
 # 		[[ "${file_status:0:2}" == '??' ]] && untracked='%F{red}●'
 # 		[[ "${file_status:0:1}" != ' ' ]] && staged='%F{green}●'
 # 		[[ "${file_status:1:2}" != ' ' ]] && unstaged='%F{yellow}●'
 # 	done
+# 	status_summary="${untracked}${unstaged}${staged}"
 
 	if [[ $untracked_dirty = 0 ]]; then
 		command git diff --no-ext-diff --quiet --exit-code
