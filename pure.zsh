@@ -82,16 +82,6 @@ prompt_pure_set_title() {
 }
 
 prompt_pure_preexec() {
-	if [[ -n $prompt_pure_git_fetch_pattern ]]; then
-		# Detect when Git is performing pull/fetch, including Git aliases.
-		local -H MATCH MBEGIN MEND match mbegin mend
-		if [[ $2 =~ (git|hub)\ (.*\ )?($prompt_pure_git_fetch_pattern)(\ .*)?$ ]]; then
-			# We must flush the async jobs to cancel our git fetch in order
-			# to avoid conflicts with the user issued pull / fetch.
-			async_flush_jobs 'prompt_pure'
-		fi
-	fi
-
 	typeset -g prompt_pure_cmd_timestamp=$EPOCHSECONDS
 
 	# Shows the current directory and executed command in the title while a process is active.
@@ -146,21 +136,13 @@ prompt_pure_preprompt_render() {
 	if [[ -n $prompt_pure_vcs_info[action] ]]; then
 		preprompt_parts+=("%F{$prompt_pure_colors[git:action]}"'$prompt_pure_vcs_info[action]%f')
 	fi
-	# Git pull/push arrows.
-	if [[ -n $prompt_pure_git_arrows ]]; then
-		preprompt_parts+=('%F{$prompt_pure_colors[git:arrow]}${prompt_pure_git_arrows}%f')
-	fi
-	# Git stash symbol (if opted in).
-	if [[ -n $prompt_pure_git_stash ]]; then
-		preprompt_parts+=('%F{$prompt_pure_colors[git:stash]}${PURE_GIT_STASH_SYMBOL:-≡}%f')
-	fi
 	# AWS profile
 	if [[ -n $AWS_PROFILE ]]; then
-		preprompt_parts+=("%F{208}☁︎ ${AWS_PROFILE}%f")
+		preprompt_parts+=("%F{208}${AWS_PROFILE}%f")
 	fi
 	# Kubernetes context
 	if [[ -n $prompt_pure_kubernetes_context ]]; then
-		preprompt_parts+=("%F{39}☸︎ ${prompt_pure_kubernetes_context}%f")
+		preprompt_parts+=("%F{39}${prompt_pure_kubernetes_context}%f")
 	fi
 
 	# Execution time.
@@ -319,77 +301,6 @@ prompt_pure_async_git_dirty() {
 	[[ -n $status_summary ]] && echo "${status_summary}%f"
 }
 
-prompt_pure_async_git_fetch() {
-	setopt localoptions noshwordsplit
-
-	local only_upstream=${1:-0}
-
-	# Sets `GIT_TERMINAL_PROMPT=0` to disable authentication prompt for Git fetch (Git 2.3+).
-	export GIT_TERMINAL_PROMPT=0
-	# Set SSH `BachMode` to disable all interactive SSH password prompting.
-	export GIT_SSH_COMMAND="${GIT_SSH_COMMAND:-"ssh"} -o BatchMode=yes"
-
-	local -a remote
-	if ((only_upstream)); then
-		local ref
-		ref=$(command git symbolic-ref -q HEAD)
-		# Set remote to only fetch information for the current branch.
-		remote=($(command git for-each-ref --format='%(upstream:remotename) %(refname)' $ref))
-		if [[ -z $remote[1] ]]; then
-			# No remote specified for this branch, skip fetch.
-			return 97
-		fi
-	fi
-
-	# Default return code, which indicates Git fetch failure.
-	local fail_code=99
-
-	# Guard against all forms of password prompts. By setting the shell into
-	# MONITOR mode we can notice when a child process prompts for user input
-	# because it will be suspended. Since we are inside an async worker, we
-	# have no way of transmitting the password and the only option is to
-	# kill it. If we don't do it this way, the process will corrupt with the
-	# async worker.
-	setopt localtraps monitor
-
-	# Make sure local HUP trap is unset to allow for signal propagation when
-	# the async worker is flushed.
-	trap - HUP
-
-	trap '
-		# Unset trap to prevent infinite loop
-		trap - CHLD
-		if [[ $jobstates = suspended* ]]; then
-			# Set fail code to password prompt and kill the fetch.
-			fail_code=98
-			kill %%
-		fi
-	' CHLD
-
-	# Do git fetch and avoid fetching tags or
-	# submodules to speed up the process.
-	command git -c gc.auto=0 fetch \
-		--quiet \
-		--no-tags \
-		--recurse-submodules=no \
-		$remote &>/dev/null &
-	wait $! || return $fail_code
-
-	unsetopt monitor
-
-	# Check arrow status after a successful `git fetch`.
-	prompt_pure_async_git_arrows
-}
-
-prompt_pure_async_git_arrows() {
-	setopt localoptions noshwordsplit
-	command git rev-list --left-right --count HEAD...@'{u}'
-}
-
-prompt_pure_async_git_stash() {
-	git rev-list --walk-reflogs --count refs/stash
-}
-
 # Try to lower the priority of the worker so that disk heavy operations
 # like `git status` has less impact on the system responsivity.
 prompt_pure_async_renice() {
@@ -439,9 +350,6 @@ prompt_pure_async_tasks() {
 		# Reset Git preprompt variables, switching working tree.
 		unset prompt_pure_git_dirty
 		unset prompt_pure_git_last_dirty_check_timestamp
-		unset prompt_pure_git_arrows
-		unset prompt_pure_git_stash
-		unset prompt_pure_git_fetch_pattern
 		prompt_pure_vcs_info[branch]=
 		prompt_pure_vcs_info[top]=
 	fi
@@ -458,22 +366,6 @@ prompt_pure_async_tasks() {
 prompt_pure_async_refresh() {
 	setopt localoptions noshwordsplit
 
-	if [[ -z $prompt_pure_git_fetch_pattern ]]; then
-		# We set the pattern here to avoid redoing the pattern check until the
-		# working tree has changed. Pull and fetch are always valid patterns.
-		typeset -g prompt_pure_git_fetch_pattern="pull|fetch"
-		async_job "prompt_pure" prompt_pure_async_git_aliases
-	fi
-
-	async_job "prompt_pure" prompt_pure_async_git_arrows
-
-	# Do not perform `git fetch` if it is disabled or in home folder.
-	if (( ${PURE_GIT_PULL:-1} )) && [[ $prompt_pure_vcs_info[top] != $HOME ]]; then
-		zstyle -t :prompt:pure:git:fetch only_upstream
-		local only_upstream=$((? == 0))
-		async_job "prompt_pure" prompt_pure_async_git_fetch $only_upstream
-	fi
-
 	# If dirty checking is sufficiently fast,
 	# tell the worker to check it again, or wait for timeout.
 	integer time_since_last_dirty_check=$(( EPOCHSECONDS - ${prompt_pure_git_last_dirty_check_timestamp:-0} ))
@@ -483,25 +375,7 @@ prompt_pure_async_refresh() {
 		async_job "prompt_pure" prompt_pure_async_git_dirty ${PURE_GIT_UNTRACKED_DIRTY:-1}
 	fi
 
-	# If stash is enabled, tell async worker to count stashes
-	if zstyle -t ":prompt:pure:git:stash" show; then
-		async_job "prompt_pure" prompt_pure_async_git_stash
-	else
-		unset prompt_pure_git_stash
-	fi
-
 	async_job "prompt_pure" prompt_pure_async_kubernetes_context
-}
-
-prompt_pure_check_git_arrows() {
-	setopt localoptions noshwordsplit
-	local arrows left=${1:-0} right=${2:-0}
-
-	(( right > 0 )) && arrows+=${PURE_GIT_DOWN_ARROW:-⇣}
-	(( left > 0 )) && arrows+=${PURE_GIT_UP_ARROW:-⇡}
-
-	[[ -n $arrows ]] || return
-	typeset -g REPLY=$arrows
 }
 
 prompt_pure_async_callback() {
@@ -591,43 +465,6 @@ prompt_pure_async_callback() {
 			# rendering of the preprompt will the result appear in a different color.
 			(( $exec_time > 5 )) && prompt_pure_git_last_dirty_check_timestamp=$EPOCHSECONDS
 			;;
-		prompt_pure_async_git_fetch|prompt_pure_async_git_arrows)
-			# `prompt_pure_async_git_fetch` executes `prompt_pure_async_git_arrows`
-			# after a successful fetch.
-			case $code in
-				0)
-					local REPLY
-					prompt_pure_check_git_arrows ${(ps:\t:)output}
-					if [[ $prompt_pure_git_arrows != $REPLY ]]; then
-						typeset -g prompt_pure_git_arrows=$REPLY
-						do_render=1
-					fi
-					;;
-				97)
-					# No remote available, make sure to clear git arrows if set.
-					if [[ -n $prompt_pure_git_arrows ]]; then
-						typeset -g prompt_pure_git_arrows=
-						do_render=1
-					fi
-					;;
-				99|98)
-					# Git fetch failed.
-					;;
-				*)
-					# Non-zero exit status from `prompt_pure_async_git_arrows`,
-					# indicating that there is no upstream configured.
-					if [[ -n $prompt_pure_git_arrows ]]; then
-						unset prompt_pure_git_arrows
-						do_render=1
-					fi
-					;;
-			esac
-			;;
-		prompt_pure_async_git_stash)
-			local prev_stash=$prompt_pure_git_stash
-			typeset -g prompt_pure_git_stash=$output
-			[[ $prev_stash != $prompt_pure_git_stash ]] && do_render=1
-      ;;
 		prompt_pure_async_kubernetes_context)
 			local prev_context=$prompt_pure_kubernetes_context
 			if (( code == 0 )); then
