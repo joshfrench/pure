@@ -138,11 +138,11 @@ prompt_pure_preprompt_render() {
 	fi
 	# AWS profile
 	if [[ -n $AWS_PROFILE ]]; then
-		preprompt_parts+=("%F{208}${AWS_PROFILE}%f")
+		preprompt_parts+=("%F{yellow}${AWS_PROFILE}%f")
 	fi
 	# Kubernetes context
 	if [[ -n $prompt_pure_kubernetes_context ]]; then
-		preprompt_parts+=("%F{39}${prompt_pure_kubernetes_context}%f")
+		preprompt_parts+=("%F{magenta}${prompt_pure_kubernetes_context}%f")
 	fi
 
 	# Execution time.
@@ -331,7 +331,9 @@ prompt_pure_async_init() {
 
 prompt_pure_async_kubernetes_context() {
 	setopt localoptions noshwordsplit
-	command kubectl config current-context 2>/dev/null
+  KUBE_CTX=$(command kubectl config current-context 2>/dev/null)
+  KUBE_NS=$(command kubectl config view --minify --output 'jsonpath={..namespace}' 2>/dev/null)
+  echo "${KUBE_PS1_CONTEXT:-N/A}:${KUBE_PS1_NAMESPACE:-default}"
 }
 
 prompt_pure_async_tasks() {
@@ -370,13 +372,12 @@ prompt_pure_async_refresh() {
 	setopt localoptions noshwordsplit
 
 	# if dirty checking is sufficiently fast, tell worker to check it again, or wait for timeout
-	# integer time_since_last_dirty_check=$(( EPOCHSECONDS - ${prompt_pure_git_last_dirty_check_timestamp:-0} ))
-	# if (( time_since_last_dirty_check > ${PURE_GIT_DELAY_DIRTY_CHECK:-1800} )); then
-	# 	unset prompt_pure_git_last_dirty_check_timestamp
-	# 	# check check if there is anything to pull
-	# 	async_job "prompt_pure" prompt_pure_async_git_status
-	# fi
-  async_job "prompt_pure" prompt_pure_async_git_status
+	integer time_since_last_dirty_check=$(( EPOCHSECONDS - ${prompt_pure_git_last_dirty_check_timestamp:-0} ))
+	if (( time_since_last_dirty_check > ${PURE_GIT_DELAY_DIRTY_CHECK:-1800} )); then
+		unset prompt_pure_git_last_dirty_check_timestamp
+		# check check if there is anything to pull
+		async_job "prompt_pure" prompt_pure_async_git_status
+	fi
 	async_job "prompt_pure" prompt_pure_async_kubernetes_context
 }
 
@@ -456,7 +457,7 @@ prompt_pure_async_callback() {
 			if [[ -z "$output" ]]; then
 				unset prompt_pure_git_status
 			else
-				typeset -g prompt_pure_git_status="$output"
+				typeset -g prompt_pure_git_status=" $output"
 			fi
 
 			[[ $prev_status != $prompt_pure_git_status ]] && do_render=1
