@@ -130,7 +130,7 @@ prompt_pure_preprompt_render() {
 	# Git branch and dirty status info.
 	typeset -gA prompt_pure_vcs_info
 	if [[ -n $prompt_pure_vcs_info[branch] ]]; then
-		preprompt_parts+=("%F{$git_color}"'${prompt_pure_vcs_info[branch]}'"%F{$git_dirty_color}"'${prompt_pure_git_dirty}%f')
+		preprompt_parts+=("%F{$git_color}"'${prompt_pure_vcs_info[branch]}'"%F{$git_dirty_color}"'${prompt_pure_git_status}%f')
 	fi
 	# Git action (for example, merge).
 	if [[ -n $prompt_pure_vcs_info[action] ]]; then
@@ -282,15 +282,6 @@ prompt_pure_async_git_dirty() {
 	if [[ "$untracked_git_mode" != 'no' ]]; then
 		untracked_git_mode='normal'
 	fi
-# prompt_pure_async_git_status() {
-# 	local file_status status_summary untracked unstaged staged
-#
-# 	git --no-optional-locks status --porcelain --ignore-submodules -unormal | while IFS='' read -r file_status; do
-# 		[[ "${file_status:0:2}" == '??' ]] && untracked='%F{red}●'
-# 		[[ "${file_status:0:1}" != ' ' ]] && staged='%F{green}●'
-# 		[[ "${file_status:1:2}" != ' ' ]] && unstaged='%F{yellow}●'
-# 	done
-# 	status_summary="${untracked}${unstaged}${staged}"
 
 	if [[ $untracked_dirty = 0 ]]; then
 		command git diff --no-ext-diff --quiet --exit-code
@@ -298,7 +289,19 @@ prompt_pure_async_git_dirty() {
 		test -z "$(GIT_OPTIONAL_LOCKS=0 command git status --porcelain --ignore-submodules -u${untracked_git_mode})"
 	fi
 
-	[[ -n $status_summary ]] && echo "${status_summary}%f"
+	return $?
+}
+
+prompt_pure_async_git_status() {
+	local file_status status_summary untracked unstaged staged
+
+	git --no-optional-locks status --porcelain --ignore-submodules -unormal | while IFS='' read -r file_status; do
+		[[ "${file_status:0:2}" == '??' ]] && untracked='%F{red}●'
+		[[ "${file_status:0:1}" != ' ' ]] && staged='%F{green}●'
+		[[ "${file_status:1:2}" != ' ' ]] && unstaged='%F{yellow}●'
+	done
+	status_summary="${untracked}${unstaged}${staged}"
+  [[ -n $status_summary ]] && echo "${status_summary}%f"
 }
 
 # Try to lower the priority of the worker so that disk heavy operations
@@ -348,7 +351,7 @@ prompt_pure_async_tasks() {
 		async_flush_jobs "prompt_pure"
 
 		# Reset Git preprompt variables, switching working tree.
-		unset prompt_pure_git_dirty
+		unset prompt_pure_git_status
 		unset prompt_pure_git_last_dirty_check_timestamp
 		prompt_pure_vcs_info[branch]=
 		prompt_pure_vcs_info[top]=
@@ -366,15 +369,14 @@ prompt_pure_async_tasks() {
 prompt_pure_async_refresh() {
 	setopt localoptions noshwordsplit
 
-	# If dirty checking is sufficiently fast,
-	# tell the worker to check it again, or wait for timeout.
-	integer time_since_last_dirty_check=$(( EPOCHSECONDS - ${prompt_pure_git_last_dirty_check_timestamp:-0} ))
-	if (( time_since_last_dirty_check > ${PURE_GIT_DELAY_DIRTY_CHECK:-1800} )); then
-		unset prompt_pure_git_last_dirty_check_timestamp
-		# Check check if there is anything to pull.
-		async_job "prompt_pure" prompt_pure_async_git_dirty ${PURE_GIT_UNTRACKED_DIRTY:-1}
-	fi
-
+	# if dirty checking is sufficiently fast, tell worker to check it again, or wait for timeout
+	# integer time_since_last_dirty_check=$(( EPOCHSECONDS - ${prompt_pure_git_last_dirty_check_timestamp:-0} ))
+	# if (( time_since_last_dirty_check > ${PURE_GIT_DELAY_DIRTY_CHECK:-1800} )); then
+	# 	unset prompt_pure_git_last_dirty_check_timestamp
+	# 	# check check if there is anything to pull
+	# 	async_job "prompt_pure" prompt_pure_async_git_status
+	# fi
+  async_job "prompt_pure" prompt_pure_async_git_status
 	async_job "prompt_pure" prompt_pure_async_kubernetes_context
 }
 
