@@ -212,25 +212,6 @@ prompt_pure_precmd() {
 	# Perform async Git dirty check and fetch.
 	prompt_pure_async_tasks
 
-	# Check if we should display the virtual env. We use a sufficiently high
-	# index of psvar (12) here to avoid collisions with user defined entries.
-	psvar[12]=
-	# Check if a Conda environment is active and display its name.
-	if [[ -n $CONDA_DEFAULT_ENV ]]; then
-		psvar[12]="${CONDA_DEFAULT_ENV//[$'\t\r\n']}"
-	fi
-	# When VIRTUAL_ENV_DISABLE_PROMPT is empty, it was unset by the user and
-	# Pure should take back control.
-	if  [[ -z $VIRTUAL_ENV_DISABLE_PROMPT || $VIRTUAL_ENV_DISABLE_PROMPT = 12 ]]; then
-		if [[ -n $VIRTUAL_ENV ]]; then
-			psvar[12]="${VIRTUAL_ENV:t}"
-			export VIRTUAL_ENV_DISABLE_PROMPT=12
-		elif [[ -n $CONDA_DEFAULT_ENV ]]; then
-			psvar[12]="${CONDA_DEFAULT_ENV:t}"
-			export VIRTUAL_ENV_DISABLE_PROMPT=12
-		fi
-	fi
-
 	# Make sure VIM prompt is reset.
 	prompt_pure_reset_prompt_symbol
 
@@ -630,7 +611,6 @@ prompt_pure_system_report() {
 	print - "- Colors: \`$(typeset -p prompt_pure_colors)\`"
 	print - "- TERM: \`$(typeset -p TERM)\`"
 	print - "- Virtualenv: \`$(typeset -p VIRTUAL_ENV_DISABLE_PROMPT)\`"
-	print - "- Conda: \`$(typeset -p CONDA_CHANGEPS1)\`"
 
 	local ohmyzsh=0
 	typeset -la frameworks
@@ -755,10 +735,6 @@ prompt_pure_setup() {
 
 	# Guard against Oh My Zsh themes overriding Pure.
 	unset ZSH_THEME
-
-	# Guard against (ana)conda changing the PS1 prompt
-	# (we manually insert the env when it's available).
-	export CONDA_CHANGEPS1=no
 }
 
 prompt_pure_setup "$@"
