@@ -143,7 +143,7 @@ prompt_pure_preprompt_render() {
 	)
 
 	PROMPT="${(j..)ps1}"
-  RPROMPT='%F{${prompt_pure_colors[path]}}%(5~<%-1~/.../%2~<%~)%f %*'
+  RPROMPT='%F{${prompt_pure_colors[path]}}%(5~|%-1~/.../%3~|%~)%f %*'
 
 	# Expand the prompt for future comparision.
 	local expanded_prompt
