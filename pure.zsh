@@ -714,11 +714,11 @@ prompt_pure_setup() {
 	PROMPT='%(12V.%F{$prompt_pure_colors[virtualenv]}%12v%f .)'
 
 	# Prompt turns red if the previous command didn't exit with 0.
-	local prompt_indicator='%(?.%F{$prompt_pure_colors[prompt:success]}.%F{$prompt_pure_colors[prompt:error]})${prompt_pure_state[prompt]}%f '
-	PROMPT+=$prompt_indicator
+	PROMPT_INDICATOR='%(?.%F{$prompt_pure_colors[prompt:success]}.%F{$prompt_pure_colors[prompt:error]})${prompt_pure_state[prompt]}%f '
+	PROMPT+=$PROMPT_INDICATOR
 
 	# Indicate continuation prompt by … and use a darker color for it.
-	PROMPT2='%F{$prompt_pure_colors[prompt:continuation]}… %(1_.%_ .%_)%f'$prompt_indicator
+	PROMPT2='%F{$prompt_pure_colors[prompt:continuation]}… %(1_.%_ .%_)%f'$PROMPT_INDICATOR
 
 	# Store prompt expansion symbols for in-place expansion via (%). For
 	# some reason it does not work without storing them in a variable first.
@@ -756,3 +756,21 @@ prompt_pure_setup() {
 }
 
 prompt_pure_setup "$@"
+
+short_prompt() {
+  echo '%(?.%F{$prompt_pure_colors[prompt:success]}.%F{$prompt_pure_colors[prompt:error]})${prompt_pure_state[prompt]}%f '
+}
+
+# TODO: truncated prompt does not show error color
+truncate-prompt() {
+  # short="%(?.%F{$prompt_pure_colors[prompt:success]}.%F{$prompt_pure_colors[prompt:error]})${prompt_pure_state[prompt]}%f "
+  if [[ $PROMPT != $PROMPT_INDICATOR ]]; then
+    PROMPT=$PROMPT_INDICATOR
+    zle .reset-prompt
+  fi
+}
+
+zle-line-finish() { truncate-prompt }
+zle -N zle-line-finish
+
+trap 'set-short-prompt; return 130' INT
