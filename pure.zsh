@@ -113,43 +113,43 @@ prompt_pure_preprompt_render() {
 
 	unset prompt_pure_async_render_requested
 
-	# Set color for Git branch/dirty status and change color if dirty checking has been delayed.
-	local git_color=$prompt_pure_colors[git:branch]
-	local git_dirty_color=$prompt_pure_colors[git:dirty]
-	[[ -n ${prompt_pure_git_last_dirty_check_timestamp+x} ]] && git_color=$prompt_pure_colors[git:branch:cached]
-
 	# Initialize the preprompt array.
 	local -a preprompt_parts
 
 	# Username and machine, if applicable.
 	[[ -n $prompt_pure_state[username] ]] && preprompt_parts+=($prompt_pure_state[username])
 
-	# Set the path.
-  preprompt_parts+=('%F{${prompt_pure_colors[path]}}%(5~<%-1~/.../%2~<%~)%f')
 	# Git branch and dirty status info.
 	typeset -gA prompt_pure_vcs_info
+  local gitinfo
+  if [[ -n $prompt_pure_vcs_info[root] ]]; then
+    gitinfo=("%F{$prompt_pure_colors[git:root]}"'$prompt_pure_vcs_info[root]%f')
+  fi
+  if ([[ -n $prompt_pure_vcs_info[root] ]] && [[ -n $prompt_pure_vcs_info[branch] ]]); then
+    gitinfo=("${gitinfo}@")
+  fi
 	if [[ -n $prompt_pure_vcs_info[branch] ]]; then
-		preprompt_parts+=("%F{$git_color}"'${prompt_pure_vcs_info[branch]}'"%F{$git_dirty_color}"'${prompt_pure_git_status}%f')
+		gitinfo=("${gitinfo}""%F{$prompt_pure_colors[git:branch]}"'${prompt_pure_vcs_info[branch]}${prompt_pure_git_status}')
 	fi
+  preprompt_parts+=$gitinfo
+
 	# Git action (for example, merge).
 	if [[ -n $prompt_pure_vcs_info[action] ]]; then
 		preprompt_parts+=("%F{$prompt_pure_colors[git:action]}"'$prompt_pure_vcs_info[action]%f')
 	fi
-	# AWS profile
+
+  # AWS profile
 	if [[ -n $AWS_PROFILE ]]; then
 		preprompt_parts+=("%F{yellow}${AWS_PROFILE}%f")
 	fi
-	# Kubernetes context
+
+  # Kubernetes context
   local kubectx
-	if [[ -n $prompt_pure_kubernetes_context ]]; then
-		kubectx=("%F{$prompt_pure_colors[kube:context]}${prompt_pure_kubernetes_context}%f")
-	fi
+	[[ -n $prompt_pure_kubernetes_context ]] && kubectx=("%F{$prompt_pure_colors[kube:context]}${prompt_pure_kubernetes_context}%f")
   if ([[ -n $prompt_pure_kubernetes_context ]] && [[ -n $prompt_pure_kubernetes_namespace ]]); then
 		kubectx=("${kubectx}:")
 	fi
-	if [[ -n $prompt_pure_kubernetes_namespace ]]; then
-		kubectx=("${kubectx}%F{$prompt_pure_colors[kube:namespace]}${prompt_pure_kubernetes_namespace}%f")
-	fi
+	[[ -n $prompt_pure_kubernetes_namespace ]] && kubectx=("${kubectx}%F{$prompt_pure_colors[kube:namespace]}${prompt_pure_kubernetes_namespace}%f")
   preprompt_parts+=$kubectx
 
 	# Execution time.
@@ -173,6 +173,7 @@ prompt_pure_preprompt_render() {
 	)
 
 	PROMPT="${(j..)ps1}"
+  RPROMPT='%F{${prompt_pure_colors[path]}}%(5~<%-1~/.../%2~<%~)%f %*'
 
 	# Expand the prompt for future comparision.
 	local expanded_prompt
@@ -265,9 +266,9 @@ prompt_pure_async_vcs_info() {
 	zstyle ':vcs_info:*' enable git
 	zstyle ':vcs_info:*' use-simple true
 	# Only export four message variables from `vcs_info`.
-	zstyle ':vcs_info:*' max-exports 3
-	# Export branch (%b), Git toplevel (%R), action (rebase/cherry-pick) (%a)
-	zstyle ':vcs_info:git*' formats '%b' '%R' '%a'
+	zstyle ':vcs_info:*' max-exports 4
+  # Export branch (%b), root (%r) Git toplevel (%R), action (rebase/cherry-pick) (%a)
+	zstyle ':vcs_info:git*' formats '%b' '%r' '%R' '%a'
 	zstyle ':vcs_info:git*' actionformats '%b' '%R' '%a'
 
 	vcs_info
@@ -275,8 +276,9 @@ prompt_pure_async_vcs_info() {
 	local -A info
 	info[pwd]=$PWD
 	info[branch]=$vcs_info_msg_0_
-	info[top]=$vcs_info_msg_1_
-	info[action]=$vcs_info_msg_2_
+  info[root]=$vcs_info_msg_1_
+	info[top]=$vcs_info_msg_2_
+	info[action]=$vcs_info_msg_3_
 
 	print -r - ${(@kvq)info}
 }
@@ -351,6 +353,7 @@ prompt_pure_async_tasks() {
 		unset prompt_pure_git_status
 		unset prompt_pure_git_last_dirty_check_timestamp
 		prompt_pure_vcs_info[branch]=
+    prompt_pure_vcs_info[root]=
 		prompt_pure_vcs_info[top]=
 	fi
 	unset MATCH MBEGIN MEND
@@ -437,6 +440,7 @@ prompt_pure_async_callback() {
 
 			# Always update branch, top-level and stash.
 			prompt_pure_vcs_info[branch]=$info[branch]
+      prompt_pure_vcs_info[root]=$info[root]
 			prompt_pure_vcs_info[top]=$info[top]
 			prompt_pure_vcs_info[action]=$info[action]
 
@@ -676,7 +680,8 @@ prompt_pure_setup() {
 	typeset -gA prompt_pure_colors_default prompt_pure_colors
 	prompt_pure_colors_default=(
 		execution_time       yellow
-		git:branch           242
+		git:branch           blue
+    git:root             blue
 		git:branch:cached    red
 		git:action           yellow
 		host                 242
