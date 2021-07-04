@@ -181,7 +181,7 @@ prompt_pure_preprompt_render() {
 
 	if [[ $1 == precmd ]]; then
 		# Initial newline, for spaciousness.
-		print
+		[[ -n $PURE_NEWLINE ]] && print
 	elif [[ $prompt_pure_last_prompt != $expanded_prompt ]]; then
 		# Redraw the prompt.
 		prompt_pure_reset_prompt
@@ -323,14 +323,14 @@ prompt_pure_async_init() {
 
 prompt_pure_async_kubernetes_context() {
 	setopt localoptions noshwordsplit
-  KUBE_CTX=$(command kubectl config current-context 2>/dev/null)
-  echo "${KUBE_CTX:-N/A}"
+  local kube_ctx=$(command kubectl config current-context 2>/dev/null)
+  echo "${kube_ctx:-N/A}"
 }
 
 prompt_pure_async_kubernetes_namespace() {
 	setopt localoptions noshwordsplit
-  KUBE_NS=$(command kubectl config view --minify --output 'jsonpath={..namespace}' 2>/dev/null)
-  echo "${KUBE_CTX:-default}"
+  local kube_ns=$(command kubectl config view --minify --output 'jsonpath={..namespace}' 2>/dev/null)
+  echo "${kube_ctx:-default}"
 }
 
 prompt_pure_async_tasks() {
@@ -761,7 +761,6 @@ short_prompt() {
   echo '%(?.%F{$prompt_pure_colors[prompt:success]}.%F{$prompt_pure_colors[prompt:error]})${prompt_pure_state[prompt]}%f '
 }
 
-# TODO: truncated prompt does not show error color
 truncate-prompt() {
   # short="%(?.%F{$prompt_pure_colors[prompt:success]}.%F{$prompt_pure_colors[prompt:error]})${prompt_pure_state[prompt]}%f "
   if [[ $PROMPT != $PROMPT_INDICATOR ]]; then
