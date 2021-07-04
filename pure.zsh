@@ -131,7 +131,9 @@ prompt_pure_preprompt_render() {
 	if [[ -n $prompt_pure_vcs_info[branch] ]]; then
 		gitinfo=("${gitinfo}""%F{$prompt_pure_colors[git:branch]}"'${prompt_pure_vcs_info[branch]}${prompt_pure_git_status}')
 	fi
-  preprompt_parts+=$gitinfo
+  if ([[ -n $prompt_pure_vcs_info[root] ]] || [[ -n $prompt_pure_vcs_info[branch] ]]); then
+    preprompt_parts+=$gitinfo
+  fi
 
 	# Git action (for example, merge).
 	if [[ -n $prompt_pure_vcs_info[action] ]]; then
@@ -145,12 +147,16 @@ prompt_pure_preprompt_render() {
 
   # Kubernetes context
   local kubectx
-	[[ -n $prompt_pure_kubernetes_context ]] && kubectx=("%F{$prompt_pure_colors[kube:context]}${prompt_pure_kubernetes_context}%f")
+	if [[ -n $prompt_pure_kubernetes_context ]]; then
+    kubectx=("%F{$prompt_pure_colors[kube:context]}${prompt_pure_kubernetes_context}%f")
+  fi
   if ([[ -n $prompt_pure_kubernetes_context ]] && [[ -n $prompt_pure_kubernetes_namespace ]]); then
 		kubectx=("${kubectx}:")
 	fi
 	[[ -n $prompt_pure_kubernetes_namespace ]] && kubectx=("${kubectx}%F{$prompt_pure_colors[kube:namespace]}${prompt_pure_kubernetes_namespace}%f")
+  if ([[ -n $prompt_pure_kubernetes_context ]] || [[ -n $prompt_pure_kubernetes_namespace ]]); then
   preprompt_parts+=$kubectx
+  fi
 
 	# Execution time.
 	[[ -n $prompt_pure_cmd_exec_time ]] && preprompt_parts+=('%F{$prompt_pure_colors[execution_time]}${prompt_pure_cmd_exec_time}%f')
