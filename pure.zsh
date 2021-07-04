@@ -141,9 +141,17 @@ prompt_pure_preprompt_render() {
 		preprompt_parts+=("%F{yellow}${AWS_PROFILE}%f")
 	fi
 	# Kubernetes context
+  local kubectx
 	if [[ -n $prompt_pure_kubernetes_context ]]; then
-		preprompt_parts+=("%F{magenta}${prompt_pure_kubernetes_context}%f")
+		kubectx=("%F{$prompt_pure_colors[kube:context]}${prompt_pure_kubernetes_context}%f")
 	fi
+  if ([[ -n $prompt_pure_kubernetes_context ]] && [[ -n $prompt_pure_kubernetes_namespace ]]); then
+		kubectx=("${kubectx}:")
+	fi
+	if [[ -n $prompt_pure_kubernetes_namespace ]]; then
+		kubectx=("${kubectx}%F{$prompt_pure_colors[kube:namespace]}${prompt_pure_kubernetes_namespace}%f")
+	fi
+  preprompt_parts+=$kubectx
 
 	# Execution time.
 	[[ -n $prompt_pure_cmd_exec_time ]] && preprompt_parts+=('%F{$prompt_pure_colors[execution_time]}${prompt_pure_cmd_exec_time}%f')
@@ -275,23 +283,6 @@ prompt_pure_async_vcs_info() {
 }
 
 # Fastest possible way to check if a Git repo is dirty.
-prompt_pure_async_git_dirty() {
-	setopt localoptions noshwordsplit
-	local untracked_dirty=$1
-	local untracked_git_mode=$(command git config --get status.showUntrackedFiles)
-	if [[ "$untracked_git_mode" != 'no' ]]; then
-		untracked_git_mode='normal'
-	fi
-
-	if [[ $untracked_dirty = 0 ]]; then
-		command git diff --no-ext-diff --quiet --exit-code
-	else
-		test -z "$(GIT_OPTIONAL_LOCKS=0 command git status --porcelain --ignore-submodules -u${untracked_git_mode})"
-	fi
-
-	return $?
-}
-
 prompt_pure_async_git_status() {
 	local file_status status_summary untracked unstaged staged
 
@@ -332,8 +323,13 @@ prompt_pure_async_init() {
 prompt_pure_async_kubernetes_context() {
 	setopt localoptions noshwordsplit
   KUBE_CTX=$(command kubectl config current-context 2>/dev/null)
+  echo "${KUBE_CTX:-N/A}"
+}
+
+prompt_pure_async_kubernetes_namespace() {
+	setopt localoptions noshwordsplit
   KUBE_NS=$(command kubectl config view --minify --output 'jsonpath={..namespace}' 2>/dev/null)
-  echo "${KUBE_PS1_CONTEXT:-N/A}:${KUBE_PS1_NAMESPACE:-default}"
+  echo "${KUBE_CTX:-default}"
 }
 
 prompt_pure_async_tasks() {
@@ -379,6 +375,7 @@ prompt_pure_async_refresh() {
 		async_job "prompt_pure" prompt_pure_async_git_status
 	fi
 	async_job "prompt_pure" prompt_pure_async_kubernetes_context
+	async_job "prompt_pure" prompt_pure_async_kubernetes_namespace
 }
 
 prompt_pure_async_callback() {
@@ -478,6 +475,15 @@ prompt_pure_async_callback() {
 
 			[[ $prev_context != $prompt_pure_kubernetes_context ]] && do_render=1
 			;;
+    prompt_pure_async_kubernetes_namespace)
+      local prev_namespace=$prompt_pure_kubernetes_namespace
+      if (( code == 0 )); then
+				typeset -g prompt_pure_kubernetes_namespace="$output"
+      else
+				unset prompt_pure_kubernetes_namespace
+      fi
+			[[ $prev_namespace != $prompt_pure_kubernetes_namespace ]] && do_render=1
+      ;;
 	esac
 
 	if (( next_pending )); then
@@ -671,12 +677,9 @@ prompt_pure_setup() {
 	typeset -gA prompt_pure_colors_default prompt_pure_colors
 	prompt_pure_colors_default=(
 		execution_time       yellow
-		git:arrow            cyan
-		git:stash            cyan
 		git:branch           242
 		git:branch:cached    red
 		git:action           yellow
-		git:dirty            218
 		host                 242
 		path                 blue
 		prompt:error         red
@@ -685,6 +688,8 @@ prompt_pure_setup() {
 		user                 242
 		user:root            default
 		virtualenv           242
+    kube:context          magenta
+    kube:namespace        magenta
 	)
 	prompt_pure_colors=("${(@kv)prompt_pure_colors_default}")
 
