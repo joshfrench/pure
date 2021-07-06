@@ -281,7 +281,7 @@ prompt_pure_async_kubernetes_context() {
 prompt_pure_async_kubernetes_namespace() {
 	setopt localoptions noshwordsplit
   local kube_ns=$(command kubectl config view --minify --output 'jsonpath={..namespace}' 2>/dev/null)
-  echo "${kube_ctx:-default}"
+  echo "${kube_ns:-default}"
 }
 
 prompt_pure_async_tasks() {
