@@ -718,4 +718,4 @@ truncate-prompt() {
 zle-line-finish() { truncate-prompt }
 zle -N zle-line-finish
 
-trap 'set-short-prompt; return 130' INT
+# trap 'set-short-prompt; return 130' INT
