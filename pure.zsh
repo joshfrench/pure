@@ -72,6 +72,8 @@ prompt_pure_set_colors() {
 	done
 }
 
+local truncate_path='%F{$prompt_pure_colors[path]}%(5~|%-1~/.../%3~|%~)%f'
+
 prompt_pure_preprompt_render() {
 	setopt localoptions noshwordsplit
 
@@ -83,30 +85,36 @@ prompt_pure_preprompt_render() {
 	# Username and machine, if applicable.
 	[[ -n $prompt_pure_state[username] ]] && preprompt_parts+=($prompt_pure_state[username])
 
+  preprompt_parts+='%*'
+
+	# Execution time.
+	[[ -n $prompt_pure_cmd_exec_time ]] && preprompt_parts+=('%F{$prompt_pure_colors[execution_time]}${prompt_pure_cmd_exec_time}%f')
+
 	# Git branch and dirty status info.
 	typeset -gA prompt_pure_vcs_info
-  local gitinfo
-  if [[ -n $prompt_pure_vcs_info[root] ]]; then
-    gitinfo=("%F{$prompt_pure_colors[git:root]}"'$prompt_pure_vcs_info[root]%f')
-  fi
-  if ([[ -n $prompt_pure_vcs_info[root] ]] && [[ -n $prompt_pure_vcs_info[branch] ]]); then
-    gitinfo=("${gitinfo}@")
-  fi
+  typeset -a path_parts
+  path_parts+=$truncate_path
 	if [[ -n $prompt_pure_vcs_info[branch] ]]; then
-		gitinfo=("${gitinfo}""%F{$prompt_pure_colors[git:branch]}"'${prompt_pure_vcs_info[branch]}${prompt_pure_git_status}')
+    path_parts+=(
+      '@'
+      "%F{$prompt_pure_colors[git:branch]}"
+      ${prompt_pure_vcs_info[branch]}
+      ${prompt_pure_git_status}
+      '%f'
+    )
 	fi
-  if ([[ -n $prompt_pure_vcs_info[root] ]] || [[ -n $prompt_pure_vcs_info[branch] ]]); then
-    preprompt_parts+=$gitinfo
-  fi
+  preprompt_parts+=${(j..)path_parts}
 
 	# Git action (for example, merge).
 	if [[ -n $prompt_pure_vcs_info[action] ]]; then
 		preprompt_parts+=("%F{$prompt_pure_colors[git:action]}"'$prompt_pure_vcs_info[action]%f')
 	fi
 
+  local -a right_parts
+
   # AWS profile
 	if [[ -n $AWS_PROFILE ]]; then
-		preprompt_parts+=("%F{yellow}${AWS_PROFILE}%f")
+		right_parts+=("%F{yellow}${AWS_PROFILE}%f")
 	fi
 
   # Kubernetes context
@@ -119,11 +127,8 @@ prompt_pure_preprompt_render() {
 	fi
 	[[ -n $prompt_pure_kubernetes_namespace ]] && kubectx=("${kubectx}%F{$prompt_pure_colors[kube:namespace]}${prompt_pure_kubernetes_namespace}%f")
   if ([[ -n $prompt_pure_kubernetes_context ]] || [[ -n $prompt_pure_kubernetes_namespace ]]); then
-  preprompt_parts+=$kubectx
+    right_parts+=$kubectx
   fi
-
-	# Execution time.
-	[[ -n $prompt_pure_cmd_exec_time ]] && preprompt_parts+=('%F{$prompt_pure_colors[execution_time]}${prompt_pure_cmd_exec_time}%f')
 
 	local cleaned_ps1=$PROMPT
 	local -H MATCH MBEGIN MEND
@@ -143,7 +148,7 @@ prompt_pure_preprompt_render() {
 	)
 
 	PROMPT="${(j..)ps1}"
-  RPROMPT='%F{${prompt_pure_colors[path]}}%(5~|%-1~/.../%3~|%~)%f %*'
+  RPROMPT="${(j..)right_parts}"
 
 	# Expand the prompt for future comparision.
 	local expanded_prompt
@@ -213,10 +218,10 @@ prompt_pure_async_vcs_info() {
 	# to be used or configured as the user pleases.
 	zstyle ':vcs_info:*' enable git
 	zstyle ':vcs_info:*' use-simple true
-	# Only export four message variables from `vcs_info`.
-	zstyle ':vcs_info:*' max-exports 4
+	# Only export three message variables from `vcs_info`.
+	zstyle ':vcs_info:*' max-exports 3
   # Export branch (%b), root (%r) Git toplevel (%R), action (rebase/cherry-pick) (%a)
-	zstyle ':vcs_info:git*' formats '%b' '%r' '%R' '%a'
+	zstyle ':vcs_info:git*' formats '%b' '%R' '%a'
 	zstyle ':vcs_info:git*' actionformats '%b' '%R' '%a'
 
 	vcs_info
@@ -224,9 +229,8 @@ prompt_pure_async_vcs_info() {
 	local -A info
 	info[pwd]=$PWD
 	info[branch]=$vcs_info_msg_0_
-  info[root]=$vcs_info_msg_1_
-	info[top]=$vcs_info_msg_2_
-	info[action]=$vcs_info_msg_3_
+	info[top]=$vcs_info_msg_1_
+	info[action]=$vcs_info_msg_2_
 
 	print -r - ${(@kvq)info}
 }
@@ -703,19 +707,30 @@ prompt_pure_setup() {
 
 prompt_pure_setup "$@"
 
-short_prompt() {
-  echo '%(?.%F{$prompt_pure_colors[prompt:success]}.%F{$prompt_pure_colors[prompt:error]})${prompt_pure_state[prompt]}%f '
-}
-
 truncate-prompt() {
-  # short="%(?.%F{$prompt_pure_colors[prompt:success]}.%F{$prompt_pure_colors[prompt:error]})${prompt_pure_state[prompt]}%f "
-  if [[ $PROMPT != $PROMPT_INDICATOR ]]; then
-    PROMPT=$PROMPT_INDICATOR
-    zle .reset-prompt
+  unset RPROMPT
+  typeset -a prompt_parts
+  prompt_parts+=(
+    '%* '
+  )
+  [[ -n $prompt_pure_cmd_exec_time ]] && prompt_parts+=('%F{$prompt_pure_colors[execution_time]}${prompt_pure_cmd_exec_time}%f ')
+  prompt_parts+=$truncate_path
+	if [[ -n $prompt_pure_vcs_info[branch] ]]; then
+    prompt_parts+=(
+      '@'
+      "%F{$prompt_pure_colors[git:branch]}"
+      ${prompt_pure_vcs_info[branch]}
+      '%f'
+      $prompt_newline
+      $PROMPT_INDICATOR
+    )
+	fi
+  truncated=${(j..)prompt_parts}
+  if [[ $PROMPT != $truncated ]]; then
+    PROMPT=$truncated
   fi
+  zle .reset-prompt
 }
 
-# zle-line-finish() { truncate-prompt }
-# zle -N zle-line-finish
-
-# trap 'set-short-prompt; return 130' INT
+zle-line-finish() { truncate-prompt }
+zle -N zle-line-finish
