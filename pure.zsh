@@ -92,9 +92,6 @@ prompt_pure_preprompt_render() {
 
 	# Git branch and dirty status info.
 	typeset -gA prompt_pure_vcs_info
-  typeset -a path_parts
-  path_parts+=$truncate_path
-  preprompt_parts+=${(j..)path_parts}
 
 	# Git action (for example, merge).
 	if [[ -n $prompt_pure_vcs_info[action] ]]; then
@@ -109,32 +106,46 @@ prompt_pure_preprompt_render() {
 	fi
 
   # Kubernetes context
-  local kubectx
-	if [[ -n $prompt_pure_kubernetes_context ]]; then
-    kubectx=("%F{$prompt_pure_colors[kube:context]}${prompt_pure_kubernetes_context}%f")
-  fi
-  if ([[ -n $prompt_pure_kubernetes_context ]] && [[ -n $prompt_pure_kubernetes_namespace ]]); then
-		kubectx=("${kubectx}:")
-	fi
-	[[ -n $prompt_pure_kubernetes_namespace ]] && kubectx=("${kubectx}%F{$prompt_pure_colors[kube:namespace]}${prompt_pure_kubernetes_namespace}%f")
-  if ([[ -n $prompt_pure_kubernetes_context ]] || [[ -n $prompt_pure_kubernetes_namespace ]]); then
-    right_parts+=$kubectx
-  fi
-
-	if [[ -n $prompt_pure_vcs_info[branch] ]]; then
-    right_parts+=(
-      ' ['
-      "%F{$prompt_pure_colors[git:branch]}"
-      ${prompt_pure_vcs_info[root]}
-      '%f'
-      '@'
-      "%F{$prompt_pure_colors[git:branch]}"
-      ${prompt_pure_vcs_info[branch]}
-      ${prompt_pure_git_status}
-      '%f'
-      ']'
+  typeset -a kube_parts
+	if [[ ! -z $prompt_pure_kubernetes_context ]]; then
+    kube_parts+=(
+      "%F{$prompt_pure_colors[kube:context]}"
+      ${prompt_pure_kubernetes_context}
+      "%f"
     )
-	fi
+    if [[ -n $prompt_pure_kubernetes_namespace ]]; then
+      kube_parts+=(
+        ":"
+        "%F{$prompt_pure_colors[kube:namespace]}"
+        ${prompt_pure_kubernetes_namespace}
+        '%f'
+      )
+    fi
+    right_parts+=${(j..)kube_parts}
+  fi
+  right_parts+=$truncate_path
+
+  # vcs info
+  typeset -a vcs_parts
+  if [[ -n ${prompt_pure_vcs_info[top]} ]]; then
+    vcs_parts+=(
+      "%F{$prompt_pure_colors[git:branch]}"
+      $prompt_pure_vcs_info[root]
+      '%f'
+    )
+    if [[ -n ${prompt_pure_vcs_info[branch]} ]]; then
+       vcs_parts+=(
+        '@'
+        "%F{$prompt_pure_colors[git:branch]}"
+        ${prompt_pure_vcs_info[branch]}
+        ${prompt_pure_git_status}
+        '%f'
+      )
+    fi
+    vcs_parts+=(
+    )
+    preprompt_parts+=${(j..)vcs_parts}
+  fi
 
 	local cleaned_ps1=$PROMPT
 	local -H MATCH MBEGIN MEND
@@ -154,7 +165,7 @@ prompt_pure_preprompt_render() {
 	)
 
 	PROMPT="${(j..)ps1}"
-  RPROMPT="${(j..)right_parts}"
+  RPROMPT="${(j. .)right_parts}"
 
 	# Expand the prompt for future comparision.
 	local expanded_prompt
@@ -286,7 +297,7 @@ prompt_pure_async_init() {
 prompt_pure_async_kubernetes_context() {
 	setopt localoptions noshwordsplit
   local kube_ctx=$(command kubectl config current-context 2>/dev/null)
-  echo "${kube_ctx:-N/A}"
+  echo "${kube_ctx}"
 }
 
 prompt_pure_async_kubernetes_namespace() {
