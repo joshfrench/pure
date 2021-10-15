@@ -94,15 +94,6 @@ prompt_pure_preprompt_render() {
 	typeset -gA prompt_pure_vcs_info
   typeset -a path_parts
   path_parts+=$truncate_path
-	if [[ -n $prompt_pure_vcs_info[branch] ]]; then
-    path_parts+=(
-      '@'
-      "%F{$prompt_pure_colors[git:branch]}"
-      ${prompt_pure_vcs_info[branch]}
-      ${prompt_pure_git_status}
-      '%f'
-    )
-	fi
   preprompt_parts+=${(j..)path_parts}
 
 	# Git action (for example, merge).
@@ -129,6 +120,21 @@ prompt_pure_preprompt_render() {
   if ([[ -n $prompt_pure_kubernetes_context ]] || [[ -n $prompt_pure_kubernetes_namespace ]]); then
     right_parts+=$kubectx
   fi
+
+	if [[ -n $prompt_pure_vcs_info[branch] ]]; then
+    right_parts+=(
+      ' ['
+      "%F{$prompt_pure_colors[git:branch]}"
+      ${prompt_pure_vcs_info[root]}
+      '%f'
+      '@'
+      "%F{$prompt_pure_colors[git:branch]}"
+      ${prompt_pure_vcs_info[branch]}
+      ${prompt_pure_git_status}
+      '%f'
+      ']'
+    )
+	fi
 
 	local cleaned_ps1=$PROMPT
 	local -H MATCH MBEGIN MEND
@@ -219,18 +225,19 @@ prompt_pure_async_vcs_info() {
 	zstyle ':vcs_info:*' enable git
 	zstyle ':vcs_info:*' use-simple true
 	# Only export three message variables from `vcs_info`.
-	zstyle ':vcs_info:*' max-exports 3
+	zstyle ':vcs_info:*' max-exports 4
   # Export branch (%b), root (%r) Git toplevel (%R), action (rebase/cherry-pick) (%a)
-	zstyle ':vcs_info:git*' formats '%b' '%R' '%a'
-	zstyle ':vcs_info:git*' actionformats '%b' '%R' '%a'
+	zstyle ':vcs_info:git*' formats '%b' '%r' '%R' '%a'
+	zstyle ':vcs_info:git*' actionformats '%b' '%r' '%R' '%a'
 
 	vcs_info
 
 	local -A info
 	info[pwd]=$PWD
 	info[branch]=$vcs_info_msg_0_
-	info[top]=$vcs_info_msg_1_
-	info[action]=$vcs_info_msg_2_
+	info[root]=$vcs_info_msg_1_
+	info[top]=$vcs_info_msg_2_
+	info[action]=$vcs_info_msg_3_
 
 	print -r - ${(@kvq)info}
 }
@@ -646,8 +653,8 @@ prompt_pure_setup() {
 		user                 242
 		user:root            default
 		virtualenv           242
-    kube:context          magenta
-    kube:namespace        magenta
+    kube:context         magenta
+    kube:namespace       magenta
 	)
 	prompt_pure_colors=("${(@kv)prompt_pure_colors_default}")
 
@@ -732,5 +739,5 @@ truncate-prompt() {
   zle .reset-prompt
 }
 
-zle-line-finish() { truncate-prompt }
-zle -N zle-line-finish
+# zle-line-finish() { truncate-prompt }
+# zle -N zle-line-finish
