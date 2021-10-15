@@ -72,20 +72,28 @@ prompt_pure_set_colors() {
 	done
 }
 
-local truncate_path='%F{$prompt_pure_colors[path]}%(5~|%-1~/.../%3~|%~)%f'
-
 prompt_pure_preprompt_render() {
 	setopt localoptions noshwordsplit
 
 	unset prompt_pure_async_render_requested
 
 	# Initialize the preprompt array.
+  local truncate_path
+  if [[ -n ${prompt_pure_vcs_info[top]} ]]; then
+    # 8~ assumes we're somewhere under ~/src/**
+    truncate_path='%F{cyan}${prompt_pure_vcs_info[root]}%F{$prompt_pure_colors[path]}%(8~|/.../%2~|${${PWD#${prompt_pure_vcs_info[top]}}})%f'
+  else
+    truncate_path='%F{$prompt_pure_colors[path]}%(6~|%-2~/.../%2~|%~)%f'
+  fi
 	local -a preprompt_parts
 
 	# Username and machine, if applicable.
 	[[ -n $prompt_pure_state[username] ]] && preprompt_parts+=($prompt_pure_state[username])
 
-  preprompt_parts+='%*'
+  preprompt_parts+=(
+    '%*'
+    $truncate_path
+  )
 
 	# Execution time.
 	[[ -n $prompt_pure_cmd_exec_time ]] && preprompt_parts+=('%F{$prompt_pure_colors[execution_time]}${prompt_pure_cmd_exec_time}%f')
@@ -97,6 +105,20 @@ prompt_pure_preprompt_render() {
 	if [[ -n $prompt_pure_vcs_info[action] ]]; then
 		preprompt_parts+=("%F{$prompt_pure_colors[git:action]}"'$prompt_pure_vcs_info[action]%f')
 	fi
+
+  # vcs info
+  typeset -a vcs_parts
+  if [[ -n ${prompt_pure_vcs_info[top]} ]]; then
+    vcs_parts+=(
+      '['
+      "%F{$prompt_pure_colors[git:branch]}"
+      ${prompt_pure_vcs_info[branch]}
+      ${prompt_pure_git_status}
+      '%f'
+      ']'
+    )
+    preprompt_parts+=${(j..)vcs_parts}
+  fi
 
   local -a right_parts
 
@@ -122,29 +144,6 @@ prompt_pure_preprompt_render() {
       )
     fi
     right_parts+=${(j..)kube_parts}
-  fi
-  right_parts+=$truncate_path
-
-  # vcs info
-  typeset -a vcs_parts
-  if [[ -n ${prompt_pure_vcs_info[top]} ]]; then
-    vcs_parts+=(
-      "%F{$prompt_pure_colors[git:branch]}"
-      $prompt_pure_vcs_info[root]
-      '%f'
-    )
-    if [[ -n ${prompt_pure_vcs_info[branch]} ]]; then
-       vcs_parts+=(
-        '@'
-        "%F{$prompt_pure_colors[git:branch]}"
-        ${prompt_pure_vcs_info[branch]}
-        ${prompt_pure_git_status}
-        '%f'
-      )
-    fi
-    vcs_parts+=(
-    )
-    preprompt_parts+=${(j..)vcs_parts}
   fi
 
 	local cleaned_ps1=$PROMPT
@@ -652,7 +651,7 @@ prompt_pure_setup() {
 	typeset -gA prompt_pure_colors_default prompt_pure_colors
 	prompt_pure_colors_default=(
 		execution_time       yellow
-		git:branch           blue
+		git:branch           default
     git:root             blue
 		git:branch:cached    red
 		git:action           yellow
@@ -725,30 +724,30 @@ prompt_pure_setup() {
 
 prompt_pure_setup "$@"
 
-truncate-prompt() {
-  unset RPROMPT
-  typeset -a prompt_parts
-  prompt_parts+=(
-    '%* '
-  )
-  [[ -n $prompt_pure_cmd_exec_time ]] && prompt_parts+=('%F{$prompt_pure_colors[execution_time]}${prompt_pure_cmd_exec_time}%f ')
-  prompt_parts+=$truncate_path
-	if [[ -n $prompt_pure_vcs_info[branch] ]]; then
-    prompt_parts+=(
-      '@'
-      "%F{$prompt_pure_colors[git:branch]}"
-      ${prompt_pure_vcs_info[branch]}
-      '%f'
-      $prompt_newline
-      $PROMPT_INDICATOR
-    )
-	fi
-  truncated=${(j..)prompt_parts}
-  if [[ $PROMPT != $truncated ]]; then
-    PROMPT=$truncated
-  fi
-  zle .reset-prompt
-}
-
+# truncate-prompt() {
+#   unset RPROMPT
+#   typeset -a prompt_parts
+#   prompt_parts+=(
+#     '%* '
+#   )
+#   [[ -n $prompt_pure_cmd_exec_time ]] && prompt_parts+=('%F{$prompt_pure_colors[execution_time]}${prompt_pure_cmd_exec_time}%f ')
+#   prompt_parts+=$truncate_path
+# 	if [[ -n $prompt_pure_vcs_info[branch] ]]; then
+#     prompt_parts+=(
+#       '@'
+#       "%F{$prompt_pure_colors[git:branch]}"
+#       ${prompt_pure_vcs_info[branch]}
+#       '%f'
+#       $prompt_newline
+#       $PROMPT_INDICATOR
+#     )
+# 	fi
+#   truncated=${(j..)prompt_parts}
+#   if [[ $PROMPT != $truncated ]]; then
+#     PROMPT=$truncated
+#   fi
+#   zle .reset-prompt
+# }
+#
 # zle-line-finish() { truncate-prompt }
 # zle -N zle-line-finish
