@@ -81,7 +81,7 @@ prompt_pure_preprompt_render() {
   local truncate_path
   if [[ -n ${prompt_pure_vcs_info[top]} ]]; then
     # 8~ assumes we're somewhere under ~/src/**
-    truncate_path='%F{cyan}${prompt_pure_vcs_info[root]}%F{$prompt_pure_colors[path]}%(8~|/.../%2~|${${PWD#${prompt_pure_vcs_info[top]}}})%f'
+    truncate_path='%F{$prompt_pure_colors[git:root]}${prompt_pure_vcs_info[root]}%F{$prompt_pure_colors[path]}%(8~|/.../%2~|${${PWD#${prompt_pure_vcs_info[top]}}})%f'
   else
     truncate_path='%F{$prompt_pure_colors[path]}%(6~|%-2~/.../%2~|%~)%f'
   fi
@@ -652,7 +652,7 @@ prompt_pure_setup() {
 	prompt_pure_colors_default=(
 		execution_time       yellow
 		git:branch           default
-    git:root             blue
+		git:root             cyan
 		git:branch:cached    red
 		git:action           yellow
 		host                 242
