@@ -656,15 +656,15 @@ prompt_pure_setup() {
 		git:branch:cached    red
 		git:action           yellow
 		host                 242
+    kube:context         magenta
+    kube:namespace       magenta
 		path                 blue
 		prompt:error         red
-		prompt:success       magenta
+		prompt:success       green
 		prompt:continuation  242
 		user                 242
 		user:root            default
 		virtualenv           242
-    kube:context         magenta
-    kube:namespace       magenta
 	)
 	prompt_pure_colors=("${(@kv)prompt_pure_colors_default}")
 
